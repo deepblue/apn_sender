@@ -55,6 +55,16 @@ module APN
       [@token.gsub(/[\s|<|>]/,'')].pack('H*')
     end
 
+    # Shorten alert message not to exceed the payload limit
+    def shorten_json(j)
+      return j if j.size <= 256
+      prefix, body, postfix = j.scan(/^(.*alert":")(.*?[^\\])(".*)$/).first
+      return j unless prefix
+      body = body[0, 255 - prefix.length - postfix.length]
+      body.sub!(/(\\|\\u[0-9a-z]{0,3})$/, "")
+      prefix + body + postfix
+    end
+
     # Converts the supplied options into the JSON needed for Apple's push notification servers.
     # Extracts :alert, :badge, and :sound keys into the 'aps' hash, merges any other hash data
     # into the root of the hash to encode and send to apple.
@@ -71,6 +81,7 @@ module APN
       end
       hsh.merge!(opts)
       ActiveSupport::JSON::encode(hsh)
+      shorten_json ActiveSupport::JSON::encode(hsh)
     end
     
     # Symbolize keys, using ActiveSupport if available
