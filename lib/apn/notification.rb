@@ -27,8 +27,6 @@ module APN
     def initialize(token, opts)
       @options = hash_as_symbols(opts.is_a?(Hash) ? opts : {:alert => opts})
       @token = token
-
-      raise "The maximum size allowed for a notification payload is 256 bytes." if packaged_notification.size.to_i > 256
     end
 
     def to_s
@@ -47,7 +45,9 @@ module APN
     def packaged_notification
       pt = packaged_token
       pm = packaged_message
-      [0, 0, 32, pt, 0, pm.size, pm].pack("ccca*cca*") 
+      raise "The maximum size allowed for a notification payload is 256 bytes." if pm.size.to_i > 256
+
+      [0, 0, 32, pt, 0, pm.size, pm].pack("ccca*cca*")
     end
 
     # Device token, compressed and hex-ified
