@@ -27,8 +27,6 @@ module APN
     def initialize(token, opts)
       @options = hash_as_symbols(opts.is_a?(Hash) ? opts : {:alert => opts})
       @token = token
-
-      raise "The maximum size allowed for a notification payload is 256 bytes." if packaged_notification.size.to_i > 256
     end
 
     def to_s
@@ -47,12 +45,24 @@ module APN
     def packaged_notification
       pt = packaged_token
       pm = packaged_message
+      raise "The maximum size allowed for a notification payload is 256 bytes." if pm.size.to_i > 256
+
       [0, 0, 32, pt, pm.size, pm].pack("ccca*na*")
     end
 
     # Device token, compressed and hex-ified
     def packaged_token
       [@token.gsub(/[\s|<|>]/,'')].pack('H*')
+    end
+
+    # Shorten alert message not to exceed the payload limit
+    def shorten_json(j)
+      return j if j.size <= 256
+      prefix, body, postfix = j.scan(/^(.*alert":")(.*?[^\\])(".*)$/).first
+      return j unless prefix
+      body = body[0, 255 - prefix.length - postfix.length]
+      body.sub!(/(\\|\\u[0-9a-z]{0,3})$/, "")
+      prefix + body + postfix
     end
 
     # Converts the supplied options into the JSON needed for Apple's push notification servers.
@@ -71,6 +81,7 @@ module APN
       end
       hsh.merge!(opts)
       ActiveSupport::JSON::encode(hsh)
+      shorten_json ActiveSupport::JSON::encode(hsh)
     end
     
     # Symbolize keys, using ActiveSupport if available
